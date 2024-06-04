@@ -638,3 +638,17 @@ class DESI(Instrument):
         url = f"https://www.legacysurvey.org/viewer/jpeg-cutout?ra={ra}&dec={dec}&layer=ls-dr10&size={size}&pixscale={pixscale}&bands={bands}"
         r = requests.get(url)
         return r.content
+
+
+class DESIQSO(DESI):
+    """DESI instrument for QSOs
+
+    Implements basic QSO stuff.
+
+    """
+    def __init__(self, lsf=None, calibration=None):
+        """Write me.
+
+        """
+        super().__init__(lsf=lsf, calibration=calibration)
+
