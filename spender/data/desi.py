@@ -506,6 +506,61 @@ class DESI(Instrument):
 
 
     @classmethod
+    def query_qsocat(
+            cls, catfile=None, fields=["SURVEY", "PROGRAM", "HEALPIX"], selection_fct=None
+    ):
+        """
+        @Grace - write me
+
+
+        Select SURVEY, PROGRAM, HEALPIX from healpix look up table for healpix that
+        match `selection_fct`. Look up table only includes information on
+        TILEID, SURVEY, PROGRAM, PETAL_LOC, HEALPIX
+
+        Parameters
+        ----------
+        dir: string
+            Root directory for data storage
+        fields: list of string
+            Catalog field names to return
+        selection_fct: callable
+            Function to select matches from all items in the main table
+
+        Returns
+        -------
+        fields: `torch.tensor`, shape (N, F)
+            Tensor of fields for the selected healpix
+
+        """
+        #import fitsio # todo - install fitsio
+        
+        if catfile is None:
+            catfile = '/global/cfs/cdirs/desi/science/lya/y1-kp6/iron-tests/catalogs/QSO_cat_iron_main_dark_healpix_zlya-altbal-20230831.fits'
+
+        if not os.path.isfile(catfile):
+            raise IOError(f'Catalog {catfile} does not exist!')
+            
+        print(f"opening {catfile}")
+        thpix = aTable.Table.read(catfile)
+        thpix = thpix['TARGETID', 'HPXPIXEL', 'SURVEY', 'PROGRAM']
+        thpix.rename_column('HPXPIXEL', 'HEALPIX')
+
+        return thpix
+
+        #if selection_fct is None:
+        #    pass
+        #else:
+        #    pass
+        #    #sel = selection_fct(thpix)
+        #
+        #_, uind = np.unique(thpix[sel]["HEALPIX"], return_index=True)
+        #
+        #out_tab = thpix[fields][sel][uind]
+        #out_tab["TARGET"] = target
+        #return out_tab
+
+
+    @classmethod
     def augment_spectra(cls, batch, redshift=True, noise=True, mask=False, ratio=0.05, z_new=None, z_max = 0.8):
         """Augment spectra for greater diversity
 
