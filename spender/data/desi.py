@@ -152,7 +152,7 @@ class DESI(Instrument):
         return filename
 
     @classmethod
-    def save_in_batches(cls, dir, ids, tag=None, batch_size=1024):
+    def save_in_batches(cls, dir, ids, tag=None, batch_size=1024, qsocat=False):
         """Save all spectra for given ids into batch files
 
         Parameters
@@ -172,12 +172,35 @@ class DESI(Instrument):
 
         """
         counter, new_batch = 0, True
+
+        if qsocat:
+            if len(np.unique(ids['SURVEY'])) != 1 or len(np.unique(ids['PROGRAM'])) != 1:
+                raise ValueError('Survey and program must be unique!')
+            survey = ids['SURVEY'][0]
+            prog = ids['PROGRAM'][0]
+
+            allids = ids.copy()
+            allhealpix = allids['HEALPIX']
+            uhealpix, uindx = np.unique(allhealpix, return_index=True)
+            ids = allids[uindx]
+            ids.remove_column('TARGETID')
+            
         for _id in ids:
-            survey, prog, hpix, target = _id
+            if qsocat:
+                # read the targets we care about for each healpix
+                for healpix in uhealpix:
+                    I = np.where(healpix == allhealpix)[0]
+                    targetids = allids['TARGETID'][I].data
 
-            f = cls.get_spectra(dir, survey, prog, hpix, return_file=True)
+                    f = os.path.join(f'/global/cfs/cdirs/desi/spectro/redux/iron/healpix/{survey}/{prog}/{healpix//100}/{healpix}/coadd-{survey}-{prog}-{healpix}.fits')
+                    #print(f)
+                    spec, w, z, target_id, norm, zerr = cls.prepare_spectra(f, targetids=targetids)
+                    import pdb ; pdb.set_trace()
+            else:
+                survey, prog, hpix, target = _id
+                f = cls.get_spectra(dir, survey, prog, hpix, return_file=True)
+                spec, w, z, target_id, norm, zerr = cls.prepare_spectra(f, target=target)
 
-            spec, w, z, target_id, norm, zerr = cls.prepare_spectra(f, target=target)
             if new_batch: 
                 batches = [spec, w, z, target_id, norm, zerr]
             else: 
@@ -245,7 +268,7 @@ class DESI(Instrument):
         return cls.prepare_spectra(flocal)
 
     @classmethod
-    def prepare_spectra(cls, filename, target=None, spectype='GALAXY'):
+    def prepare_spectra(cls, filename, targetids=None, target=None, spectype='GALAXY'):
         """Prepare spectra in DESI healpix for analysis
 
         This method creates an extended mask, using the original DESI mask and
@@ -282,7 +305,7 @@ class DESI(Instrument):
         # read spectra file
         hdulist = fits.open(filename)
         survey = hdulist[0].header['SURVEY'].upper()
-        meta = aTable.Table.read(filename) # meta data 
+        meta = aTable.Table.read(filename, 'FIBERMAP') # meta data
         target_id = hdulist[1].data['TARGETID'] # unique target ID
 
         # read redrock file
@@ -291,11 +314,14 @@ class DESI(Instrument):
         z = torch.tensor(rr[1].data['Z'].astype(np.float32))
         zerr = torch.tensor(rr[1].data['ZERR'].astype(np.float32))
 
-        keep = ((meta['COADD_FIBERSTATUS'] == 0) &                  # good fiber 
-                (meta['%s_DESI_TARGET' % survey] != 0) &            # is DESI target
-                (rr[1].data['ZWARN'] == 0) &                        # no warning flags
-                (rr[1].data['SPECTYPE'] == spectype) &              # is a galaxy according to redrock
-                (rr[1].data['Z'] < 0.8))                            # Redshift < 0.8
+        if targetids is not None:
+            keep = np.isin(target_id, targetids)
+        else:
+            keep = ((meta['COADD_FIBERSTATUS'] == 0) &                  # good fiber 
+                    (meta['%s_DESI_TARGET' % survey] != 0) &            # is DESI target
+                    (rr[1].data['ZWARN'] == 0) &                        # no warning flags
+                    (rr[1].data['SPECTYPE'] == spectype) &              # is a galaxy according to redrock
+                    (rr[1].data['Z'] < 0.8))                            # Redshift < 0.8
 
         if target is not None: 
             target = target.upper()
@@ -438,8 +464,12 @@ class DESI(Instrument):
         for i in range(ntarget):
             # for redshift invariant encoder: select norm window in restframe
             wave_rest = cls._wave_obs / (1 + z[i])
-            # flatish region that is well observed out to z ~ 0.5
-            sel = (w[i] > 0) & (wave_rest > 5300) & (wave_rest < 5850)
+            if targetids is not None: # hack!! fixme - only for QSO project!
+                #sel = (w[i] > 0) & (wave_rest > 1450.) & (wave_rest < 1550.)
+                sel = w[i] > 0. # hack!!!!
+            else:
+                # flatish region that is well observed out to z ~ 0.5
+                sel = (w[i] > 0) & (wave_rest > 5300) & (wave_rest < 5850)
             if sel.count_nonzero() > 0:
                 norm[i] = torch.median(spec[i][sel])
             # remove spectra (from training) for which no valid norm could be found

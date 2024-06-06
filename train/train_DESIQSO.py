@@ -403,6 +403,8 @@ if __name__ == "__main__":
 
     # data loaders
     trainloaders = [ inst.get_data_loader(args.dir, tag="Stars", which="train",  batch_size=args.batch_size, shuffle=True, shuffle_instance=True) for inst in instruments ]
+    pdb.set_trace()
+    
     validloaders = [ inst.get_data_loader(args.dir,  tag="Stars", which="valid", batch_size=args.batch_size, shuffle=True, shuffle_instance=True) for inst in instruments ]
 
     # get augmentation function
