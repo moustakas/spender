@@ -173,6 +173,9 @@ class DESI(Instrument):
         """
         counter, new_batch = 0, True
 
+        if not os.path.isdir(dir):
+            os.makedirs(dir)
+
         if qsocat:
             if len(np.unique(ids['SURVEY'])) != 1 or len(np.unique(ids['PROGRAM'])) != 1:
                 raise ValueError('Survey and program must be unique!')
@@ -184,18 +187,20 @@ class DESI(Instrument):
             uhealpix, uindx = np.unique(allhealpix, return_index=True)
             ids = allids[uindx]
             ids.remove_column('TARGETID')
+            print(f'Working on {len(ids)} unique healpixels.')
             
         for _id in ids:
             if qsocat:
+                healpix, _, _ = _id
                 # read the targets we care about for each healpix
-                for healpix in uhealpix:
-                    I = np.where(healpix == allhealpix)[0]
-                    targetids = allids['TARGETID'][I].data
+                I = np.where(healpix == allhealpix)[0]
+                targetids = allids['TARGETID'][I].data
 
-                    f = os.path.join(f'/global/cfs/cdirs/desi/spectro/redux/iron/healpix/{survey}/{prog}/{healpix//100}/{healpix}/coadd-{survey}-{prog}-{healpix}.fits')
-                    #print(f)
-                    spec, w, z, target_id, norm, zerr = cls.prepare_spectra(f, targetids=targetids)
-                    import pdb ; pdb.set_trace()
+                f = os.path.join(f'/global/cfs/cdirs/desi/spectro/redux/iron/healpix/{survey}/{prog}/{healpix//100}/{healpix}/coadd-{survey}-{prog}-{healpix}.fits')
+                #print(f)
+                spec, w, z, target_id, norm, zerr = cls.prepare_spectra(f, targetids=targetids)
+                assert(len(target_id) == len(targetids))
+                #import pdb ; pdb.set_trace()
             else:
                 survey, prog, hpix, target = _id
                 f = cls.get_spectra(dir, survey, prog, hpix, return_file=True)
@@ -203,15 +208,16 @@ class DESI(Instrument):
 
             if new_batch: 
                 batches = [spec, w, z, target_id, norm, zerr]
-            else: 
-                batches[0] = torch.concatenate([batch[0], spec], axis=0)
-                batches[1] = torch.concatenate([batch[1], w], axis=0)
-                batches[2] = torch.concatenate([batch[2], z], axis=0)
-                batches[3] = torch.concatenate([batch[3], target_id], axis=0)
-                batches[4] = torch.concatenate([batch[4], norm], axis=0)
-                batches[5] = torch.concatenate([batch[5], zerr], axis=0)
-            
-            N = batches[0].shape[0]
+                new_batch = False
+            else:
+                batches[0] = torch.concatenate([batches[0], spec], axis=0)
+                batches[1] = torch.concatenate([batches[1], w], axis=0)
+                batches[2] = torch.concatenate([batches[2], z], axis=0)
+                batches[3] = torch.concatenate([batches[3], target_id], axis=0)
+                batches[4] = torch.concatenate([batches[4], norm], axis=0)
+                batches[5] = torch.concatenate([batches[5], zerr], axis=0)
+               
+            N = batches[0].shape[0] # number of spectra
             while N > batch_size:
                 batch = [_batch[:batch_size] for _batch in batches]
 
@@ -575,6 +581,9 @@ class DESI(Instrument):
         thpix = thpix['TARGETID', 'HPXPIXEL', 'SURVEY', 'PROGRAM']
         thpix.rename_column('HPXPIXEL', 'HEALPIX')
 
+        print('Hack! Selecting just 20480 QSOs')
+        thpix = thpix[:20480]
+
         return thpix
 
         #if selection_fct is None:
@@ -724,16 +733,4 @@ class DESI(Instrument):
         r = requests.get(url)
         return r.content
 
-
-class DESIQSO(DESI):
-    """DESI instrument for QSOs
-
-    Implements basic QSO stuff.
-
-    """
-    def __init__(self, lsf=None, calibration=None):
-        """Write me.
-
-        """
-        super().__init__(lsf=lsf, calibration=calibration)
 

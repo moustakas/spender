@@ -376,7 +376,7 @@ if __name__ == "__main__":
     parser.add_argument("dir", help="data file directory")
     parser.add_argument("outfile", help="output file name")
     parser.add_argument("-n", "--latents", help="latent dimensionality", type=int, default=2)
-    parser.add_argument("-b", "--batch_size", help="batch size", type=int, default=512)
+    parser.add_argument("-b", "--batch_size", help="batch size", type=int, default=1024)
     parser.add_argument("-l", "--batch_number", help="number of batches per epoch", type=int, default=None)
     parser.add_argument("-r", "--rate", help="learning rate", type=float, default=1e-3)
     parser.add_argument("-zmax", "--z_max", help="constrain redshifts to z_max", type=float, default=5.)
@@ -388,7 +388,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # define instruments
-    instruments = [ desi.DESIQSO() ]
+    instruments = [ desi.DESI() ]
     n_encoder = len(instruments)
 
     # restframe wavelength for reconstructed spectra
@@ -402,10 +402,11 @@ if __name__ == "__main__":
         print ("Restframe:\t{:.0f} .. {:.0f} A ({} bins)".format(lmbda_min, lmbda_max, bins))
 
     # data loaders
-    trainloaders = [ inst.get_data_loader(args.dir, tag="Stars", which="train",  batch_size=args.batch_size, shuffle=True, shuffle_instance=True) for inst in instruments ]
-    pdb.set_trace()
-    
-    validloaders = [ inst.get_data_loader(args.dir,  tag="Stars", which="valid", batch_size=args.batch_size, shuffle=True, shuffle_instance=True) for inst in instruments ]
+    print('Data loaders')
+    trainloaders = [ inst.get_data_loader(args.dir, tag="QSO", which="train",  batch_size=args.batch_size,
+                                          shuffle=True, shuffle_instance=True) for inst in instruments ]
+    validloaders = [ inst.get_data_loader(args.dir,  tag="QSO", which="valid", batch_size=args.batch_size,
+                                          shuffle=True, shuffle_instance=True) for inst in instruments ]
 
     # get augmentation function
     if args.augmentation:
@@ -414,6 +415,7 @@ if __name__ == "__main__":
         aug_fcts = [ None ]
 
     # define training sequence
+    print('Defining training sequence')
     FULL = {"data":[True],"decoder":True}
     train_sequence = prepare_train([FULL])
 
@@ -424,6 +426,7 @@ if __name__ == "__main__":
         print("similarity_slope:",len(ANNEAL_SCHEDULE),ANNEAL_SCHEDULE)
 
     # define and train the model
+    print('Defining and training the model')
     n_hidden = (64, 256, 1024)
     models = [ SpectrumAutoencoder(instrument,
                                    wave_rest,
