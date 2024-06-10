@@ -103,7 +103,7 @@ class DESI(Instrument):
             tag = "Variable"
         classname = cls.__mro__[0].__name__
         filename = f"{classname}{tag}*_*.pkl"
-        batches = glob.glob(dir + "/desi_y1_qso/" + filename)
+        batches = glob.glob(dir + "/" + filename)
 
         NBATCH = len(batches)
         print("Dividing batches into subsets (train, valid, test)")
@@ -147,6 +147,7 @@ class DESI(Instrument):
         filename = os.path.join(dir, f"{classname}{tag}_{counter}.pkl")
 
         with open(filename, "wb") as f:
+            pickle.dump(batch, f)
             return filename
 
     @classmethod
