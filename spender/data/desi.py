@@ -79,10 +79,8 @@ class DESI(Instrument):
         else:
             subset = None
         load_fct = partial(load_batch, subset=subset)
-        data = BatchedFilesDataset(
-            files, load_fct, shuffle=shuffle, shuffle_instance=shuffle_instance
-        )
-        return DataLoader(data, batch_size=batch_size)
+        batched_data = BatchedFilesDataset( files, load_fct, shuffle=shuffle, shuffle_instance=shuffle_instance)
+        return DataLoader(batched_data, batch_size=batch_size)
 
     @classmethod
     def list_batches(cls, dir, which=None, tag=None):
@@ -105,12 +103,14 @@ class DESI(Instrument):
             tag = "Variable"
         classname = cls.__mro__[0].__name__
         filename = f"{classname}{tag}*_*.pkl"
-        batches = glob.glob(dir + "/" + filename)
+        batches = glob.glob(dir + "/desi_y1_qso/" + filename)
 
         NBATCH = len(batches)
+        print("Dividing batches into subsets (train, valid, test)")
         train_batches = batches[: int(0.7 * NBATCH)]
         valid_batches = batches[int(0.7 * NBATCH) : int(0.85 * NBATCH)]
         test_batches = batches[int(0.85 * NBATCH) :]
+        print(f"train batches is {len(train_batches)} long")
         if which == "test":
             return test_batches
         elif which == "valid":
@@ -119,7 +119,6 @@ class DESI(Instrument):
             return train_batches
         else:
             return batches
-
     @classmethod
     def save_batch(cls, dir, batch, tag=None, counter=None):
         """Save batch into a pickled file
@@ -148,8 +147,7 @@ class DESI(Instrument):
         filename = os.path.join(dir, f"{classname}{tag}_{counter}.pkl")
 
         with open(filename, "wb") as f:
-            pickle.dump(batch, f)
-        return filename
+            return filename
 
     @classmethod
     def save_in_batches(cls, dir, ids, tag=None, batch_size=1024, qsocat=False):
@@ -193,6 +191,7 @@ class DESI(Instrument):
             if qsocat:
                 healpix, _, _ = _id
                 # read the targets we care about for each healpix
+                print(f"Working on Healpix {healpix}")
                 I = np.where(healpix == allhealpix)[0]
                 targetids = allids['TARGETID'][I].data
 
@@ -467,6 +466,7 @@ class DESI(Instrument):
 
         # normalize spectra:
         norm = torch.zeros(ntarget)
+        print("Normalizing flow of spectra")
         for i in range(ntarget):
             # for redshift invariant encoder: select norm window in restframe
             wave_rest = cls._wave_obs / (1 + z[i])
