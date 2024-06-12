@@ -1,7 +1,8 @@
 import torch
 from torch import nn
-from torchinterp1d import interp1d
 from .util import calc_normalization
+#from torchinterp1d import interp1d
+from .util import interp1d
 
 
 class MLP(nn.Sequential):
@@ -336,7 +337,7 @@ class SpectrumDecoder(nn.Module):
         else:
             wave_obs = instrument.wave_obs
 
-        spectrum = interp1d(wave_redshifted, x, wave_obs)
+        spectrum = interp1d(wave_redshifted.float(), x.float(), wave_obs.float())
 
         # convolve with LSF
         if instrument.lsf is not None:
